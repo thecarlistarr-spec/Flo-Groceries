@@ -1,6 +1,6 @@
 const API='https://klaskacubfmbtuvcrisr.supabase.co/functions/v1/grocery-api';
 const cats=['Produce','Meat','Dairy','Pantry','Frozen','Household','Other'];
-let items=[],search='';
+let items=[],search='',syncTimer=null;
 const listEl=document.getElementById('list'),toastEl=document.getElementById('toast'),statusEl=document.getElementById('status');
 const setupEl=document.getElementById('setup'),mainEl=document.getElementById('main'),whoEl=document.getElementById('who');
 let who=localStorage.getItem('floWho')||'',label=localStorage.getItem('floLabel')||'';
@@ -16,4 +16,6 @@ async function addItem(){const input=document.getElementById('new');const n=inpu
 async function toggle(id,completed){try{await api('update','PATCH',{completed},id);await refresh(true)}catch(e){toast(e.message)}}
 async function editItem(id){const x=items.find(i=>i.id===id);if(!x)return;const name=prompt('Item name',x.name);if(name===null)return;if(!name.trim()){if(confirm('Delete this item?')){try{await api('delete','DELETE',null,id);await refresh()}catch(e){toast(e.message)}}return}try{await api('update','PATCH',{name:name.trim()},id);await refresh()}catch(e){toast(e.message)}}
 async function clearDone(){if(!items.some(x=>x.completed))return;if(!confirm('Clear completed items?'))return;try{await api('clear','POST',{});await refresh()}catch(e){toast(e.message)}}
-if(!who){setupEl.hidden=false;statusEl.textContent='Setup needed'}else{mainEl.hidden=false;whoEl.textContent=(label||'Household')+' · shared household list';document.getElementById('add').onclick=addItem;document.getElementById('new').onkeydown=e=>{if(e.key==='Enter')addItem()};document.getElementById('clear').onclick=clearDone;document.getElementById('search').oninput=e=>{search=e.target.value;renderList()};refresh();setInterval(()=>{if(document.visibilityState==='visible')refresh(true)},4000)}
+function bindMain(){setupEl.hidden=true;mainEl.hidden=false;whoEl.textContent=(label||'Household')+' · shared household list';document.getElementById('add').onclick=addItem;document.getElementById('new').onkeydown=e=>{if(e.key==='Enter')addItem()};document.getElementById('clear').onclick=clearDone;document.getElementById('search').oninput=e=>{search=e.target.value;renderList()};if(!syncTimer)syncTimer=setInterval(()=>{if(document.visibilityState==='visible')refresh(true)},4000)}
+async function setupDevice(){const input=document.getElementById('setupCode');const code=(input?.value||'').trim();if(!code)return;const prior=who;who=code;statusEl.textContent='Checking…';try{const r=await api('list');label=code.toLowerCase().startsWith('carli-')?'Carli':code.toLowerCase().startsWith('danny-')?'Danny':'Household';localStorage.setItem('floWho',who);localStorage.setItem('floLabel',label);items=r.items||[];statusEl.textContent='Synced';bindMain();renderList()}catch(e){who=prior;statusEl.textContent='Setup needed';toast('That setup code did not work')}}
+if(!who){setupEl.hidden=false;statusEl.textContent='Setup needed';document.getElementById('setupBtn').onclick=setupDevice;document.getElementById('setupCode').onkeydown=e=>{if(e.key==='Enter')setupDevice()}}else{bindMain();refresh()}
